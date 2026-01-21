@@ -1,3 +1,6 @@
+# =========================================================
+# IMPORT
+# =========================================================
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -26,16 +29,23 @@ st.set_page_config(
 # =========================================================
 @st.cache_resource
 def load_model():
-    # MODEL SUDAH BERUPA PIPELINE (preprocessing + model)
-    return joblib.load("models/best_model.pkl")
+    model = joblib.load("models/best_model.pkl")
+    preprocessor = joblib.load("models/preprocessing.pkl")
+    return model, preprocessor
 
-model = load_model()
+model, preprocessor = load_model()
 
 @st.cache_data
 def load_data():
     return pd.read_csv("data/external/telco_customer_churn.csv")
 
 df = load_data()
+
+# =========================================================
+# PREPARE DATA (GLOBAL)
+# =========================================================
+X = df.drop(columns=["Churn", "customerID"])
+y = df["Churn"].map({"Yes": 1, "No": 0})
 
 # =========================================================
 # SIDEBAR
@@ -85,6 +95,7 @@ if page == "Dashboard EDA":
         .size()
         .reset_index(name="Count")
     )
+
     fig = px.bar(
         contract_churn,
         x="Contract",
@@ -98,8 +109,8 @@ if page == "Dashboard EDA":
 # PREDIKSI CHURN
 # =========================================================
 elif page == "Prediksi Churn":
-    st.title("Prediksi Customer Churn")
-    st.write("Masukkan data pelanggan di bawah ini:")
+    st.title("🔮 Prediksi Customer Churn")
+    st.write("Masukkan data pelanggan:")
 
     col1, col2 = st.columns(2)
 
@@ -127,30 +138,32 @@ elif page == "Prediksi Churn":
         )
 
     if st.button("Prediksi"):
-        # DATA HARUS MENTAH (BELUM ENCODE / SCALE)
-        input_df = pd.DataFrame({
-            "tenure": [tenure],
-            "MonthlyCharges": [monthly_charges],
-            "Contract": [contract],
-            "InternetService": [internet_service],
-            "PaymentMethod": [payment_method]
-        })
+        # =================================================
+        # TEMPLATE INPUT (HARUS SESUAI TRAINING)
+        # =================================================
+        input_df = pd.DataFrame(columns=X.columns)
+        input_df.loc[0] = 0  # default aman
 
-        prob = model.predict_proba(input_df)[0][1]
-        prediction = model.predict(input_df)[0]
+        # isi input user
+        input_df.loc[0, "tenure"] = tenure
+        input_df.loc[0, "MonthlyCharges"] = monthly_charges
+        input_df.loc[0, "Contract"] = contract
+        input_df.loc[0, "InternetService"] = internet_service
+        input_df.loc[0, "PaymentMethod"] = payment_method
+
+        # =================================================
+        # PREDIKSI
+        # =================================================
+        X_processed = preprocessor.transform(input_df)
+        prob = model.predict_proba(X_processed)[0][1]
+        prediction = model.predict(X_processed)[0]
 
         st.subheader("Hasil Prediksi")
 
         if prediction == 1:
-            st.error(
-                f"Pelanggan diprediksi **CHURN** "
-                f"(Probabilitas: {prob:.2f})"
-            )
+            st.error(f"Pelanggan diprediksi **CHURN** (Probabilitas: {prob:.2f})")
         else:
-            st.success(
-                f"Pelanggan diprediksi **TIDAK CHURN** "
-                f"(Probabilitas: {prob:.2f})"
-            )
+            st.success(f"Pelanggan diprediksi **TIDAK CHURN** (Probabilitas: {prob:.2f})")
 
 # =========================================================
 # EVALUASI MODEL
@@ -158,28 +171,57 @@ elif page == "Prediksi Churn":
 elif page == "Evaluasi Model":
     st.title("Evaluasi Model")
 
-    X = df.drop(columns=["Churn", "customerID"])
-    y = df["Churn"].map({"Yes": 1, "No": 0})
-
-    # LANGSUNG PAKAI MODEL (PIPELINE)
-    y_pred = model.predict(X)
-    y_prob = model.predict_proba(X)[:, 1]
+    X_processed = preprocessor.transform(X)
+    y_pred = model.predict(X_processed)
+    y_prob = model.predict_proba(X_processed)[:, 1]
 
     col1, col2, col3 = st.columns(3)
-    col1.metric("Accuracy", f"{accuracy_score(y, y_pred):.2f}")
-    col2.metric("Precision", f"{precision_score(y, y_pred):.2f}")
-    col3.metric("Recall", f"{recall_score(y, y_pred):.2f}")
 
-    col4, col5 = st.columns(2)
-    col4.metric("F1-Score", f"{f1_score(y, y_pred):.2f}")
-    col5.metric("ROC-AUC", f"{roc_auc_score(y, y_prob):.2f}")
+    col1.metric("Accuracy", f"{accuracy_score(y, y_pred):.3f}")
+    col2.metric("Precision", f"{precision_score(y, y_pred):.3f}")
+    col3.metric("Recall", f"{recall_score(y, y_pred):.3f}")
 
+    st.metric("F1-Score", f"{f1_score(y, y_pred):.3f}")
+    st.metric("ROC-AUC", f"{roc_auc_score(y, y_prob):.3f}")
+
+    st.subheader("Confusion Matrix")
     cm = confusion_matrix(y, y_pred)
     cm_df = pd.DataFrame(
         cm,
         index=["Actual No", "Actual Yes"],
         columns=["Predicted No", "Predicted Yes"]
     )
+    st.dataframe(cm_df)
 
-    st.subheader("Confusion Matrix")
-    st.dataframe(cm_df, use_container_width=True)
+# =========================================================
+# DOKUMENTASI
+# =========================================================
+elif page == "Dokumentasi":
+    st.title("Dokumentasi Proyek")
+
+    st.markdown("""
+    ### Deskripsi
+    Aplikasi ini memprediksi kemungkinan customer churn
+    menggunakan Machine Learning.
+
+    ### Dataset
+    - Telco Customer Churn (Kaggle)
+    - 7.043 data pelanggan
+
+    ### Model
+    - Logistic Regression
+    - Random Forest
+    - **XGBoost (Model Terbaik)**
+
+    ### Fitur
+    - Dashboard EDA
+    - Prediksi Churn
+    - Evaluasi Model
+    - Confusion Matrix
+    """)
+
+# =========================================================
+# FOOTER
+# =========================================================
+st.markdown("---")
+st.caption("Capstone Project Data Mining | Naufal Ferdiansyah")
