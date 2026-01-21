@@ -154,9 +154,8 @@ elif page == "Prediksi Churn":
         # =================================================
         # PREDIKSI
         # =================================================
-        X_processed = preprocessor.transform(input_df)
-        prob = model.predict_proba(X_processed)[0][1]
-        prediction = model.predict(X_processed)[0]
+        prob = model.predict_proba(input_df)[0][1]
+        prediction = model.predict(input_df)[0]
 
         st.subheader("Hasil Prediksi")
 
@@ -171,9 +170,9 @@ elif page == "Prediksi Churn":
 elif page == "Evaluasi Model":
     st.title("Evaluasi Model")
 
-    X_processed = preprocessor.transform(X)
-    y_pred = model.predict(X_processed)
-    y_prob = model.predict_proba(X_processed)[:, 1]
+    # LANGSUNG KE MODEL (pipeline)
+    y_pred = model.predict(X)
+    y_prob = model.predict_proba(X)[:, 1]
 
     col1, col2, col3 = st.columns(3)
 
@@ -184,14 +183,16 @@ elif page == "Evaluasi Model":
     st.metric("F1-Score", f"{f1_score(y, y_pred):.3f}")
     st.metric("ROC-AUC", f"{roc_auc_score(y, y_prob):.3f}")
 
-    st.subheader("Confusion Matrix")
     cm = confusion_matrix(y, y_pred)
     cm_df = pd.DataFrame(
         cm,
         index=["Actual No", "Actual Yes"],
         columns=["Predicted No", "Predicted Yes"]
     )
+
+    st.subheader("Confusion Matrix")
     st.dataframe(cm_df)
+
 
 # =========================================================
 # DOKUMENTASI
