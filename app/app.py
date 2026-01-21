@@ -154,8 +154,60 @@ elif page == "Prediksi Churn":
     # ==================================
     # PREDIKSI (PIPELINE)
     # ==================================
-    prob = model.predict_proba(input_df)[0][1]
-    prediction = model.predict(input_df)[0]
+        elif page == "Prediksi Churn":
+    st.title("🔮 Prediksi Customer Churn")
+
+    st.write("Masukkan data pelanggan di bawah ini:")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        tenure = st.slider("Tenure (bulan)", 0, 72, 12)
+        monthly_charges = st.number_input("Monthly Charges", 0.0, 200.0, 70.0)
+        contract = st.selectbox(
+            "Contract",
+            ["Month-to-month", "One year", "Two year"]
+        )
+
+    with col2:
+        internet_service = st.selectbox(
+            "Internet Service",
+            ["DSL", "Fiber optic", "No"]
+        )
+        payment_method = st.selectbox(
+            "Payment Method",
+            [
+                "Electronic check",
+                "Mailed check",
+                "Bank transfer (automatic)",
+                "Credit card (automatic)"
+            ]
+        )
+
+    # ================================
+    # TOMBOL PREDIKSI 
+    # ================================
+    if st.button("Prediksi"):
+        # AMBIL 1 DATA ASLI SEBAGAI TEMPLATE
+        input_df = X.sample(1, random_state=42).copy()
+
+        # TIMPA DENGAN INPUT USER
+        input_df["tenure"] = tenure
+        input_df["MonthlyCharges"] = monthly_charges
+        input_df["Contract"] = contract
+        input_df["InternetService"] = internet_service
+        input_df["PaymentMethod"] = payment_method
+
+        # PREDIKSI (MODEL PIPELINE)
+        prob = model.predict_proba(input_df)[0][1]
+        prediction = model.predict(input_df)[0]
+
+        st.subheader("📌 Hasil Prediksi")
+
+        if prediction == 1:
+            st.error(f"⚠️ Pelanggan diprediksi **CHURN** (Probabilitas: {prob:.2f})")
+        else:
+            st.success(f"✅ Pelanggan diprediksi **TIDAK CHURN** (Probabilitas: {prob:.2f})")
 
     # ==================================
     # OUTPUT
